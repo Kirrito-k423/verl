@@ -276,8 +276,30 @@ class Worker(WorkerHelper):
             # RAY_EXPERIMENTAL_NOSET_*_VISIBLE_DEVICES is set,
             # so we need to set local rank when the flag is set.
             device_name = "NPU" if is_npu_available else "GPU"
-            local_rank = ray.get_runtime_context().get_accelerator_ids()[device_name][0]
-            os.environ["LOCAL_RANK"] = local_rank
+            accelerator_ids = ray.get_runtime_context().get_accelerator_ids().get(device_name, [])
+            local_rank = str(accelerator_ids[0]) if accelerator_ids else os.getenv("LOCAL_RANK")
+            visible_key = get_visible_devices_keyword().upper()
+            visible_devices = os.getenv(visible_key)
+            if local_rank is None:
+                if visible_devices:
+                    local_rank = visible_devices.split(",")[0].strip()
+            if local_rank is None:
+                raise RuntimeError(
+                    f"failed to resolve LOCAL_RANK for {device_name}; "
+                    "set LOCAL_RANK or the visible-devices env before worker init"
+                )
+            os.environ["LOCAL_RANK"] = str(local_rank)
+            print(
+                "[VERL_DEVICE_SETUP]",
+                {
+                    "device_name": device_name,
+                    "accelerator_ids": accelerator_ids,
+                    "local_rank_env": os.getenv("LOCAL_RANK"),
+                    "resolved_local_rank": str(local_rank),
+                    "visible_key": visible_key,
+                    "visible_devices": visible_devices,
+                },
+            )
             get_torch_device().set_device(int(local_rank))
 
     def _configure_with_store(self, store: dict):

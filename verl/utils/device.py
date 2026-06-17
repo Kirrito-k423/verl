@@ -19,6 +19,41 @@ from packaging import version
 logger = logging.getLogger(__name__)
 
 
+class _AvailabilityProxy:
+    """Re-evaluate accelerator availability at use time instead of import time."""
+
+    def __init__(self, checker):
+        self._checker = checker
+
+    def __bool__(self) -> bool:
+        return self._checker()
+
+    def __repr__(self) -> str:
+        return repr(bool(self))
+
+
+def _runtime_cuda_available() -> bool:
+    return torch.cuda.is_available()
+
+
+def _runtime_npu_available() -> bool:
+    if is_torch_npu_available(check_device=True):
+        return True
+
+    # Ray NPU workers can fail the eager device-count probe before the runtime
+    # finishes assigning local rank and visible devices. In those workers, the
+    # presence of torch.npu plus explicit Ascend visibility is a stronger signal
+    # than the transient `torch.npu.is_available()` result.
+    return hasattr(torch, "npu") and any(
+        os.environ.get(name)
+        for name in (
+            "ASCEND_RT_VISIBLE_DEVICES",
+            "ASCEND_VISIBLE_DEVICES",
+            "RAY_EXPERIMENTAL_NOSET_ASCEND_RT_VISIBLE_DEVICES",
+        )
+    )
+
+
 def is_torch_npu_available(check_device=True) -> bool:
     """Check if Ascend NPU is available for PyTorch operations.
 
@@ -43,8 +78,8 @@ def is_torch_npu_available(check_device=True) -> bool:
         return False
 
 
-is_cuda_available = torch.cuda.is_available()
-is_npu_available = is_torch_npu_available()
+is_cuda_available = _AvailabilityProxy(_runtime_cuda_available)
+is_npu_available = _AvailabilityProxy(_runtime_npu_available)
 
 
 def get_resource_name() -> str:
