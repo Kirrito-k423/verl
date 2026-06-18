@@ -56,7 +56,8 @@ def offload_veomni_model_to_cpu(model, empty_cache: bool = True):
 
         fsdp_param_group._training_state = TrainingState.IDLE
 
-    model.reshard()
+    if hasattr(model, "reshard"):
+        model.reshard()
     model.cpu()
     if empty_cache:
         get_torch_device().empty_cache()

@@ -61,6 +61,9 @@ rms_norm_implementation: eager
 swiglu_mlp_implementation: eager
 rotary_pos_emb_implementation: eager
 load_balancing_loss_implementation: eager
+rms_norm_gated_implementation: fla
+causal_conv1d_implementation: fla
+chunk_gated_delta_rule_implementation: fla
 
 force_use_huggingface: false
 

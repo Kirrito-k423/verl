@@ -16,7 +16,7 @@ import logging
 import unittest
 from unittest.mock import Mock, mock_open, patch
 
-from verl.utils.device import check_ipc_version_support, get_npu_versions
+from verl.utils.device import check_ipc_version_support, get_npu_versions, is_support_ipc
 
 
 class TestCheckIPCVersionSupport(unittest.TestCase):
@@ -234,6 +234,31 @@ class TestGetNPUVersions(unittest.TestCase):
             get_npu_versions()
 
         self.assertIn("Could not find version in CANN toolkit info file", str(context.exception))
+
+
+class TestIsSupportIPC(unittest.TestCase):
+    """Test fallback behavior when NPU IPC capability cannot be determined."""
+
+    @patch("verl.utils.device.logger")
+    @patch("verl.utils.device.get_npu_versions", side_effect=FileNotFoundError("npu-smi"))
+    @patch("verl.utils.device.is_npu_available", True)
+    @patch("verl.utils.device.is_cuda_available", False)
+    def test_is_support_ipc_missing_npu_smi_falls_back_to_shm(
+        self, _mock_cuda, _mock_npu, _mock_get_versions, mock_logger
+    ):
+        self.assertFalse(is_support_ipc())
+        mock_logger.warning.assert_called_once()
+
+    @patch("verl.utils.device.logger")
+    @patch("verl.utils.device.check_ipc_version_support", side_effect=RuntimeError("bad version"))
+    @patch("verl.utils.device.get_npu_versions", return_value=("25.5.0", "8.3.rc1"))
+    @patch("verl.utils.device.is_npu_available", True)
+    @patch("verl.utils.device.is_cuda_available", False)
+    def test_is_support_ipc_invalid_version_falls_back_to_shm(
+        self, _mock_cuda, _mock_npu, _mock_get_versions, _mock_check, mock_logger
+    ):
+        self.assertFalse(is_support_ipc())
+        mock_logger.warning.assert_called_once()
 
 
 if __name__ == "__main__":

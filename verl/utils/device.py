@@ -387,11 +387,9 @@ def is_support_ipc() -> bool:
         try:
             software_version, cann_version = get_npu_versions()
             return check_ipc_version_support(software_version, cann_version)
-
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"Failed to execute npu-smi command: {e}") from e
         except Exception as e:
-            raise RuntimeError(f"Error checking IPC support: {e}") from e
+            logger.warning("Failed to determine IPC support on NPU, falling back to shared memory: %s", e)
+            return False
 
     # For other devices (CPU), return False
     return False

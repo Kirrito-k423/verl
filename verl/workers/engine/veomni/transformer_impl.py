@@ -232,7 +232,18 @@ class VeOmniEngine(FSDPEngine):
             swiglu_mlp_implementation=self.engine_config.swiglu_mlp_implementation,
             rotary_pos_emb_implementation=self.engine_config.rotary_pos_emb_implementation,
             load_balancing_loss_implementation=self.engine_config.load_balancing_loss_implementation,
+            rms_norm_gated_implementation=self.engine_config.rms_norm_gated_implementation,
+            causal_conv1d_implementation=self.engine_config.causal_conv1d_implementation,
+            chunk_gated_delta_rule_implementation=self.engine_config.chunk_gated_delta_rule_implementation,
         )
+
+        foundation_init_device = self.engine_config.init_device
+        # Single-rank VeOmni on Ascend can fail during to_empty(..., device="npu")
+        # + per-parameter copy_ while loading weights. If we're going to keep the
+        # model CPU-offloaded anyway, load the foundation weights on CPU first and
+        # rely on the existing offload/load path to move them onto NPU before use.
+        if foundation_init_device == "npu" and not parallel_state.get_parallel_state().fsdp_enabled and self._is_offload_param:
+            foundation_init_device = "cpu"
 
         # Load base model with specified configuration and dtype
         module = build_foundation_model(
@@ -241,7 +252,7 @@ class VeOmniEngine(FSDPEngine):
             torch_dtype="float32" if self.engine_config.mixed_precision else "bfloat16",
             attn_implementation=self.engine_config.attn_implementation,
             ops_implementation=ops_implementation,
-            init_device=self.engine_config.init_device,
+            init_device=foundation_init_device,
         )
         log_gpu_memory_usage("After load base model", logger=logger)
 

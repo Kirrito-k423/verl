@@ -318,6 +318,12 @@ class VeOmniEngineConfig(EngineConfig):
             Moonlight), ``"liger_kernel"``, ``"npu"``.
         load_balancing_loss_implementation (str): MoE load-balancing loss kernel.
             ``"eager"`` (default) or ``"triton"``.
+        rms_norm_gated_implementation (str): Qwen3.5 GatedDeltaNet fused RMSNorm backend.
+            Common values: ``"fla"`` (default), ``"eager"``, ``"npu"``.
+        causal_conv1d_implementation (str): Qwen3.5 GatedDeltaNet causal conv1d backend.
+            Common values: ``"fla"`` (default) or ``"eager"``.
+        chunk_gated_delta_rule_implementation (str): Qwen3.5 GatedDeltaNet chunk delta-rule backend.
+            Common values: ``"fla"`` (default), ``"eager"``, ``"flash_qla"``.
         force_use_huggingface (bool): Force loading model from huggingface, default False
         activation_gpu_limit (float): When enabling activation offload, `activation_gpu_limit` GB
             activations are allowed to reserve on GPU, default 0.0
@@ -367,6 +373,11 @@ class VeOmniEngineConfig(EngineConfig):
     swiglu_mlp_implementation: str = "eager"
     rotary_pos_emb_implementation: str = "eager"
     load_balancing_loss_implementation: str = "eager"
+    # Qwen3.5 GatedDeltaNet-specific kernel selectors. Keep VeOmni's upstream
+    # defaults so existing GPU configs preserve current behavior.
+    rms_norm_gated_implementation: str = "fla"
+    causal_conv1d_implementation: str = "fla"
+    chunk_gated_delta_rule_implementation: str = "fla"
     force_use_huggingface: bool = False
     activation_gpu_limit: float = 0.0
     basic_modules: Optional[list[str]] = field(default_factory=list)
