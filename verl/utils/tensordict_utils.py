@@ -483,6 +483,7 @@ def index_select_tensor_dict(batch: TensorDict, indices: torch.Tensor | list[int
         indices = torch.tensor(indices)
 
     assert indices.dim() == 1, "indices must be a 1D tensor"
+    index_list = [int(idx) for idx in indices.detach().cpu().tolist()]
 
     data_dict = {}
     batch_size = indices.shape[0]
@@ -492,8 +493,11 @@ def index_select_tensor_dict(batch: TensorDict, indices: torch.Tensor | list[int
             if isinstance(tensor, torch.Tensor) and not tensor.is_nested:
                 data_dict[key] = tensor[indices]
             elif isinstance(tensor, torch.Tensor) and tensor.is_nested:
-                tensor_lst = tensor.unbind()  # for performance
-                selected_tensors = [tensor_lst[idx] for idx in indices]
+                try:
+                    tensor_lst = tensor.unbind()  # for performance
+                    selected_tensors = [tensor_lst[idx] for idx in index_list]
+                except RuntimeError:
+                    selected_tensors = [tensor[idx] for idx in index_list]
                 data_dict[key] = nested_tensor_from_tensor_list(
                     selected_tensors, ragged_idx=getattr(tensor, "_ragged_idx", tensor.dim() - 1)
                 )
