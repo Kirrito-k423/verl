@@ -182,6 +182,21 @@ def nested_tensor_from_tensor_list(tensors: list[torch.Tensor], ragged_idx: int 
     return nested_tensor
 
 
+def _nested_tensor_from_index_list(tensor: torch.Tensor, index_list: list[int]) -> torch.Tensor:
+    ragged_idx = getattr(tensor, "_ragged_idx", tensor.dim() - 1)
+    cat_dim = ragged_idx - 1
+    offsets = tensor.offsets()
+    values = tensor.values()
+    selected_tensors = []
+    for idx in index_list:
+        start = int(offsets[idx].item())
+        end = int(offsets[idx + 1].item())
+        slices = [slice(None)] * values.dim()
+        slices[cat_dim] = slice(start, end)
+        selected_tensors.append(values[tuple(slices)])
+    return nested_tensor_from_tensor_list(selected_tensors, ragged_idx=ragged_idx)
+
+
 def concat_nested_tensors(tensors: list[torch.Tensor]) -> torch.Tensor:
     """Concatenate multiple nested tensors along the batch dimension.
 
@@ -496,11 +511,11 @@ def index_select_tensor_dict(batch: TensorDict, indices: torch.Tensor | list[int
                 try:
                     tensor_lst = tensor.unbind()  # for performance
                     selected_tensors = [tensor_lst[idx] for idx in index_list]
+                    data_dict[key] = nested_tensor_from_tensor_list(
+                        selected_tensors, ragged_idx=getattr(tensor, "_ragged_idx", tensor.dim() - 1)
+                    )
                 except RuntimeError:
-                    selected_tensors = [tensor[idx] for idx in index_list]
-                data_dict[key] = nested_tensor_from_tensor_list(
-                    selected_tensors, ragged_idx=getattr(tensor, "_ragged_idx", tensor.dim() - 1)
-                )
+                    data_dict[key] = _nested_tensor_from_index_list(tensor, index_list)
             else:
                 # This handles NonTensorStack (indexable by batch dim) and NonTensorData (scalar metadata).
                 if tensor.shape:
